@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -63,6 +64,10 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				}
 			},
+			fontFamily: {
+				sans: ['Inter', 'sans-serif'],
+				heading: ['Montserrat', 'sans-serif'],
+			},
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
@@ -84,12 +89,48 @@ export default {
 					to: {
 						height: '0'
 					}
-				}
+				},
+				'pulse-glow': {
+					'0%, 100%': {
+						opacity: '1',
+						transform: 'scale(1)',
+					},
+					'50%': {
+						opacity: '0.8',
+						transform: 'scale(1.05)',
+					},
+				},
+				'waveform': {
+					'0%, 100%': { height: '25%' },
+					'25%': { height: '65%' },
+					'50%': { height: '85%' },
+					'75%': { height: '45%' },
+				},
+				'slide-up': {
+					'0%': { transform: 'translateY(20px)', opacity: '0' },
+					'100%': { transform: 'translateY(0)', opacity: '1' },
+				},
+				'fade-in': {
+					'0%': { opacity: '0' },
+					'100%': { opacity: '1' },
+				},
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
-			}
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'pulse-glow': 'pulse-glow 2s infinite ease-in-out',
+				'waveform-1': 'waveform 1.2s infinite ease-in-out',
+				'waveform-2': 'waveform 1.5s infinite ease-in-out 0.2s',
+				'waveform-3': 'waveform 1.8s infinite ease-in-out 0.1s',
+				'waveform-4': 'waveform 1.3s infinite ease-in-out 0.3s',
+				'waveform-5': 'waveform 1.6s infinite ease-in-out 0.5s',
+				'slide-up': 'slide-up 0.6s ease-out',
+				'fade-in': 'fade-in 0.6s ease-out',
+			},
+			backgroundImage: {
+				'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+				'hero-pattern': 'linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url("/images/hero-bg.jpg")',
+			},
 		}
 	},
 	plugins: [require("tailwindcss-animate")],
