@@ -1,8 +1,9 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
+import { AdminAuth } from "@/components/admin/AdminAuth";
 import {
   Dialog,
   DialogContent,
@@ -23,11 +24,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
-import { Play, Pencil, Trash2, Upload, Plus } from "lucide-react";
+import { Play, Pencil, Trash2, Upload, Plus, Mail } from "lucide-react";
 import { useBeatsStore, Beat } from "@/hooks/useBeatsStore";
 import { formatTime } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { motion } from "framer-motion";
 
 const Dashboard = () => {
   const { beats, setCurrentBeat, addBeat, updateBeat, deleteBeat } =
@@ -38,6 +40,8 @@ const Dashboard = () => {
   const [currentEditBeat, setCurrentEditBeat] = useState<Beat | null>(null);
   const [currentDeleteId, setCurrentDeleteId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [contactSubmissions, setContactSubmissions] = useState<any[]>([]);
   const [newBeat, setNewBeat] = useState<Partial<Beat>>({
     title: "",
     artist: "Beat Alchemy",
@@ -51,6 +55,42 @@ const Dashboard = () => {
   const coverArtInputRef = useRef<HTMLInputElement>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverArtFile, setCoverArtFile] = useState<File | null>(null);
+
+  // Check for stored admin authentication on mount
+  useEffect(() => {
+    const adminAuth = localStorage.getItem('adminAuthenticated');
+    if (adminAuth === 'true') {
+      setIsAuthenticated(true);
+      fetchContactSubmissions();
+    }
+  }, []);
+
+  // Fetch contact submissions when authenticated
+  const fetchContactSubmissions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contact_submissions')
+        .select('*')
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      
+      setContactSubmissions(data || []);
+    } catch (error) {
+      console.error("Error fetching contact submissions:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load contact submissions",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle admin authentication
+  const handleAuthSuccess = () => {
+    setIsAuthenticated(true);
+    fetchContactSubmissions();
+  };
 
   // Open edit dialog and set beat to edit
   const handleOpenEditDialog = (beat: Beat) => {
@@ -316,59 +356,127 @@ const Dashboard = () => {
     }
   };
 
+  // Mark contact submission as processed
+  const toggleContactProcessed = async (id: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('contact_submissions')
+        .update({ processed: !currentStatus })
+        .eq('id', id);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setContactSubmissions(prevSubmissions =>
+        prevSubmissions.map(sub =>
+          sub.id === id ? { ...sub, processed: !currentStatus } : sub
+        )
+      );
+      
+      toast({
+        title: "Status updated",
+        description: `Message marked as ${!currentStatus ? 'processed' : 'unprocessed'}`
+      });
+    } catch (error) {
+      console.error("Error updating submission:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update submission status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Admin logout
+  const handleLogout = () => {
+    localStorage.removeItem('adminAuthenticated');
+    localStorage.removeItem('adminUsername');
+    setIsAuthenticated(false);
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
 
       <main className="flex-1 pt-24">
-        <section className="py-8">
-          <div className="container mx-auto px-4">
-            <div className="flex justify-between items-center mb-8">
-              <h1 className="text-3xl md:text-4xl font-bold">Beat Dashboard</h1>
-              <Button onClick={() => setIsAddDialogOpen(true)}>
-                <Plus className="mr-2" size={16} /> Add New Beat
-              </Button>
+        {!isAuthenticated ? (
+          <section className="py-16">
+            <AdminAuth onAuthSuccess={handleAuthSuccess} />
+          </section>
+        ) : (
+          <section className="py-8">
+            <div className="container mx-auto px-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-bold">Admin Dashboard</h1>
+                  <p className="text-muted-foreground">
+                    Welcome back, {localStorage.getItem('adminUsername') || 'Admin'}
+                  </p>
+                </div>
+                <div className="flex gap-4">
+                  <Button onClick={() => setIsAddDialogOpen(true)}>
+                    <Plus className="mr-2" size={16} /> Add New Beat
+                  </Button>
+                  <Button variant="outline" onClick={handleLogout}>Logout</Button>
+                </div>
+              </div>
+
+              <Tabs defaultValue="beats" className="w-full">
+                <TabsList className="mb-6">
+                  <TabsTrigger value="beats">Beat Management</TabsTrigger>
+                  <TabsTrigger value="contact">Contact Messages</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="beats">
+                  <Tabs defaultValue="all" className="w-full">
+                    <TabsList className="mb-6">
+                      <TabsTrigger value="all">All Beats</TabsTrigger>
+                      <TabsTrigger value="published">Published</TabsTrigger>
+                      <TabsTrigger value="drafts">Drafts</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="all">
+                      <BeatTable
+                        beats={beats}
+                        onPlay={setCurrentBeat}
+                        onEdit={handleOpenEditDialog}
+                        onDelete={handleOpenDeleteDialog}
+                        onTogglePublished={handleTogglePublished}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="published">
+                      <BeatTable
+                        beats={beats.filter((beat) => beat.isPublished)}
+                        onPlay={setCurrentBeat}
+                        onEdit={handleOpenEditDialog}
+                        onDelete={handleOpenDeleteDialog}
+                        onTogglePublished={handleTogglePublished}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="drafts">
+                      <BeatTable
+                        beats={beats.filter((beat) => !beat.isPublished)}
+                        onPlay={setCurrentBeat}
+                        onEdit={handleOpenEditDialog}
+                        onDelete={handleOpenDeleteDialog}
+                        onTogglePublished={handleTogglePublished}
+                      />
+                    </TabsContent>
+                  </Tabs>
+                </TabsContent>
+
+                <TabsContent value="contact">
+                  <ContactMessagesTable 
+                    submissions={contactSubmissions} 
+                    onToggleProcessed={toggleContactProcessed} 
+                  />
+                </TabsContent>
+              </Tabs>
             </div>
-
-            <Tabs defaultValue="all" className="w-full">
-              <TabsList className="mb-6">
-                <TabsTrigger value="all">All Beats</TabsTrigger>
-                <TabsTrigger value="published">Published</TabsTrigger>
-                <TabsTrigger value="drafts">Drafts</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="all">
-                <BeatTable
-                  beats={beats}
-                  onPlay={setCurrentBeat}
-                  onEdit={handleOpenEditDialog}
-                  onDelete={handleOpenDeleteDialog}
-                  onTogglePublished={handleTogglePublished}
-                />
-              </TabsContent>
-
-              <TabsContent value="published">
-                <BeatTable
-                  beats={beats.filter((beat) => beat.isPublished)}
-                  onPlay={setCurrentBeat}
-                  onEdit={handleOpenEditDialog}
-                  onDelete={handleOpenDeleteDialog}
-                  onTogglePublished={handleTogglePublished}
-                />
-              </TabsContent>
-
-              <TabsContent value="drafts">
-                <BeatTable
-                  beats={beats.filter((beat) => !beat.isPublished)}
-                  onPlay={setCurrentBeat}
-                  onEdit={handleOpenEditDialog}
-                  onDelete={handleOpenDeleteDialog}
-                  onTogglePublished={handleTogglePublished}
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-        </section>
+          </section>
+        )}
       </main>
 
       {/* Add Beat Dialog */}
@@ -711,6 +819,74 @@ const BeatTable = ({
         ))}
       </TableBody>
     </Table>
+  );
+};
+
+// Contact messages table component
+interface ContactMessagesTableProps {
+  submissions: any[];
+  onToggleProcessed: (id: string, currentStatus: boolean) => void;
+}
+
+const ContactMessagesTable = ({
+  submissions,
+  onToggleProcessed,
+}: ContactMessagesTableProps) => {
+  if (submissions.length === 0) {
+    return (
+      <div className="text-center py-12 bg-secondary rounded-lg">
+        <h3 className="text-xl font-medium mb-2">No contact messages yet</h3>
+        <p className="text-muted-foreground">Messages from the contact form will appear here</p>
+      </div>
+    );
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+  };
+
+  return (
+    <div className="space-y-6">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Message</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead className="text-center">Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {submissions.map((submission) => (
+            <TableRow key={submission.id} className={submission.processed ? 'opacity-60' : ''}>
+              <TableCell className="font-medium">{submission.name}</TableCell>
+              <TableCell>
+                <a href={`mailto:${submission.email}`} className="text-primary hover:underline flex items-center gap-1">
+                  {submission.email} <Mail size={14} />
+                </a>
+              </TableCell>
+              <TableCell className="max-w-xs truncate">{submission.message}</TableCell>
+              <TableCell>{formatDate(submission.created_at)}</TableCell>
+              <TableCell className="text-center">
+                <div className="flex items-center justify-center">
+                  <Switch
+                    checked={submission.processed}
+                    onCheckedChange={() =>
+                      onToggleProcessed(submission.id, submission.processed)
+                    }
+                  />
+                  <span className="ml-2 text-xs">
+                    {submission.processed ? "Processed" : "New"}
+                  </span>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 };
 

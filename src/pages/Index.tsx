@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+
+import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,8 +15,20 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { useBeatsStore } from "@/hooks/useBeatsStore";
 
+// Import animation library
+import { motion, useScroll, useTransform } from "framer-motion";
+
 const Index = () => {
   const { beats, setCurrentBeat } = useBeatsStore();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: scrollRef,
+    offset: ["start start", "end end"],
+  });
+  
+  // Create animation values based on scroll
+  const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "20%"]);
+  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
   // Get featured beats (top 3 published beats)
   const featuredBeats = beats.filter((beat) => beat.isPublished).slice(0, 3);
@@ -33,16 +46,56 @@ const Index = () => {
       ))}
     </div>
   );
+  
+  // Animated background with particles
+  const ParticleBackground = () => {
+    return (
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-secondary/10 mix-blend-normal" />
+        
+        {/* Animated particles */}
+        {Array.from({ length: 20 }).map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute rounded-full bg-primary/20"
+            style={{
+              width: Math.random() * 6 + 2,
+              height: Math.random() * 6 + 2,
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+            animate={{
+              y: [0, Math.random() * 100 - 50],
+              x: [0, Math.random() * 100 - 50],
+              opacity: [0, 0.5, 0],
+            }}
+            transition={{
+              duration: Math.random() * 15 + 15,
+              repeat: Infinity,
+              ease: "linear",
+              delay: Math.random() * 10,
+            }}
+          />
+        ))}
+      </div>
+    );
+  };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col" ref={scrollRef}>
       <Header />
 
-      {/* Hero Section */}
-      <section className="pt-24 pb-16 md:pt-32 md:pb-24 bg-gradient-to-br from-background via-background to-secondary">
+      {/* Hero Section with Parallax */}
+      <motion.section className="pt-24 pb-16 md:pt-32 md:pb-24 bg-gradient-to-br from-background via-background to-secondary relative overflow-hidden">
+        <ParticleBackground />
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center gap-8">
-            <div className="md:w-1/2 space-y-6 animate-fade-in">
+            <motion.div 
+              className="md:w-1/2 space-y-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+            >
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
                 Crafting{" "}
                 <span className="text-primary">Sonic Masterpieces</span> for
@@ -58,69 +111,122 @@ const Index = () => {
                     Browse Beats <ArrowRight className="ml-2" size={16} />
                   </Link>
                 </Button>
-                <Button size="lg" variant="outline">
-                  Learn More
+                <Button size="lg" variant="outline" asChild>
+                  <Link to="/contact">
+                    Contact Us
+                  </Link>
                 </Button>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="md:w-1/2 flex justify-center">
+            <motion.div 
+              className="md:w-1/2 flex justify-center"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
+            >
               <div className="relative w-full max-w-md">
                 <div className="aspect-square rounded-lg overflow-hidden bg-secondary border border-primary/20 shadow-xl shadow-primary/10">
-                  <img
+                  <motion.img
+                    style={{ y: backgroundY }}
                     src="/images/hero-img.jpg"
                     alt="Beat production"
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <div className="absolute -bottom-4 -right-4 bg-primary rounded-full p-6 shadow-lg">
+                <motion.div 
+                  className="absolute -bottom-4 -right-4 bg-primary rounded-full p-6 shadow-lg"
+                  animate={{ 
+                    boxShadow: ["0px 0px 8px rgba(124, 58, 237, 0.2)", "0px 0px 16px rgba(124, 58, 237, 0.6)", "0px 0px 8px rgba(124, 58, 237, 0.2)"] 
+                  }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                >
                   <WaveformAnimation />
-                </div>
+                </motion.div>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Stats Section */}
-      <section className="py-16 bg-secondary">
+      <motion.section 
+        className="py-16 bg-secondary relative overflow-hidden"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6 }}
+      >
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-            <div className="space-y-2">
+            <motion.div 
+              className="space-y-2"
+              initial={{ y: 40, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+            >
               <div className="inline-flex items-center justify-center bg-primary/10 p-4 rounded-full mb-4">
                 <Music size={32} className="text-primary" />
               </div>
               <h3 className="text-3xl md:text-4xl font-bold">100+</h3>
               <p className="text-muted-foreground">Beats Produced</p>
-            </div>
+            </motion.div>
 
-            <div className="space-y-2">
+            <motion.div 
+              className="space-y-2"
+              initial={{ y: 40, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+            >
               <div className="inline-flex items-center justify-center bg-primary/10 p-4 rounded-full mb-4">
                 <Headphones size={32} className="text-primary" />
               </div>
               <h3 className="text-3xl md:text-4xl font-bold">1M+</h3>
               <p className="text-muted-foreground">Spotify Streams</p>
-            </div>
+            </motion.div>
 
-            <div className="space-y-2">
+            <motion.div 
+              className="space-y-2"
+              initial={{ y: 40, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.5 }}
+            >
               <div className="inline-flex items-center justify-center bg-primary/10 p-4 rounded-full mb-4">
                 <Users size={32} className="text-primary" />
               </div>
               <h3 className="text-3xl md:text-4xl font-bold">50+</h3>
               <p className="text-muted-foreground">Artist Collaborations</p>
-            </div>
+            </motion.div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Featured Beats Section */}
       <section className="py-16">
         <div className="container mx-auto px-4">
-          <h2 className="section-title">Featured Beats</h2>
+          <motion.h2 
+            className="section-title"
+            initial={{ x: -20, opacity: 0 }}
+            whileInView={{ x: 0, opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
+            Featured Beats
+          </motion.h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-            {featuredBeats.map((beat) => (
-              <div key={beat.id} className="beat-card">
+            {featuredBeats.map((beat, index) => (
+              <motion.div 
+                key={beat.id} 
+                className="beat-card"
+                initial={{ y: 20, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+              >
                 <div className="beat-card-cover">
                   <img
                     src={beat.coverArt}
@@ -152,25 +258,54 @@ const Index = () => {
                     </Button>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
 
-          <div className="mt-10 text-center">
+          <motion.div 
+            className="mt-10 text-center"
+            initial={{ y: 20, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
             <Button size="lg" asChild>
               <Link to="/browse">
                 View All Beats <ArrowRight className="ml-2" size={16} />
               </Link>
             </Button>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Experience Section */}
-      <section className="py-16 bg-secondary">
-        <div className="container mx-auto px-4">
+      <motion.section 
+        className="py-16 bg-secondary relative overflow-hidden"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6 }}
+      >
+        {/* Background gradient motion */}
+        <motion.div 
+          className="absolute inset-0 bg-gradient-radial from-primary/5 to-transparent"
+          style={{ scale: 1.5 }}
+          animate={{ 
+            rotate: [0, 360],
+            opacity: [0.5, 0.3, 0.5],
+          }}
+          transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+        />
+        
+        <div className="container mx-auto px-4 relative z-10">
           <div className="flex flex-col md:flex-row items-center gap-12">
-            <div className="md:w-1/2 space-y-6">
+            <motion.div 
+              className="md:w-1/2 space-y-6"
+              initial={{ x: -30, opacity: 0 }}
+              whileInView={{ x: 0, opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
               <h2 className="section-title">Professional Experience</h2>
               <p className="text-lg text-muted-foreground">
                 With over 10 years of production experience, Beat Alchemy has
@@ -180,7 +315,13 @@ const Index = () => {
               </p>
 
               <div className="space-y-4">
-                <div className="flex items-center space-x-4">
+                <motion.div 
+                  className="flex items-center space-x-4"
+                  initial={{ x: -20, opacity: 0 }}
+                  whileInView={{ x: 0, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                >
                   <div className="bg-primary/10 p-2 rounded-full">
                     <Award size={24} className="text-primary" />
                   </div>
@@ -192,9 +333,15 @@ const Index = () => {
                       Our beats have been featured in Grammy-nominated albums
                     </p>
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="flex items-center space-x-4">
+                <motion.div 
+                  className="flex items-center space-x-4"
+                  initial={{ x: -20, opacity: 0 }}
+                  whileInView={{ x: 0, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                >
                   <div className="bg-primary/10 p-2 rounded-full">
                     <Music size={24} className="text-primary" />
                   </div>
@@ -204,9 +351,15 @@ const Index = () => {
                       Professional mixing and mastering for every beat
                     </p>
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="flex items-center space-x-4">
+                <motion.div 
+                  className="flex items-center space-x-4"
+                  initial={{ x: -20, opacity: 0 }}
+                  whileInView={{ x: 0, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                >
                   <div className="bg-primary/10 p-2 rounded-full">
                     <Headphones size={24} className="text-primary" />
                   </div>
@@ -216,61 +369,121 @@ const Index = () => {
                       Over 1 million streams across major platforms
                     </p>
                   </div>
-                </div>
+                </motion.div>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="md:w-1/2">
+            <motion.div 
+              className="md:w-1/2"
+              initial={{ scale: 0.9, opacity: 0 }}
+              whileInView={{ scale: 1, opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
               <div className="grid grid-cols-2 gap-4">
-                <div className="aspect-square rounded-lg overflow-hidden">
+                <motion.div 
+                  className="aspect-square rounded-lg overflow-hidden"
+                  whileHover={{ scale: 1.05 }}
+                  transition={{ duration: 0.3 }}
+                >
                   <img
                     src="/images/studio-session.jpg"
                     alt="Studio session"
                     className="w-full h-full object-cover"
                   />
-                </div>
-                <div className="aspect-square rounded-lg overflow-hidden mt-8">
+                </motion.div>
+                <motion.div 
+                  className="aspect-square rounded-lg overflow-hidden mt-8"
+                  whileHover={{ scale: 1.05 }}
+                  transition={{ duration: 0.3 }}
+                >
                   <img
                     src="/images/production-equipment.jpg"
                     alt="Production equipment"
                     className="w-full h-full object-cover"
                   />
-                </div>
-                <div className="aspect-square rounded-lg overflow-hidden -mt-8">
+                </motion.div>
+                <motion.div 
+                  className="aspect-square rounded-lg overflow-hidden -mt-8"
+                  whileHover={{ scale: 1.05 }}
+                  transition={{ duration: 0.3 }}
+                >
                   <img
                     src="/images/mixing-device.jpg"
                     alt="Mixing console"
                     className="w-full h-full object-cover"
                   />
-                </div>
-                <div className="aspect-square rounded-lg overflow-hidden">
+                </motion.div>
+                <motion.div 
+                  className="aspect-square rounded-lg overflow-hidden"
+                  whileHover={{ scale: 1.05 }}
+                  transition={{ duration: 0.3 }}
+                >
                   <img
                     src="/images/artist-collaboration.jpg"
                     alt="Artist collaboration"
                     className="w-full h-full object-cover"
                   />
-                </div>
+                </motion.div>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-primary/10">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">
+      <motion.section 
+        className="py-16 bg-primary/10 relative overflow-hidden"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6 }}
+      >
+        {/* Animated gradient background */}
+        <motion.div 
+          className="absolute inset-0"
+          animate={{ 
+            background: [
+              "radial-gradient(circle at 20% 50%, rgba(124, 58, 237, 0.1) 0%, rgba(0, 0, 0, 0) 70%)",
+              "radial-gradient(circle at 60% 30%, rgba(124, 58, 237, 0.1) 0%, rgba(0, 0, 0, 0) 70%)",
+              "radial-gradient(circle at 20% 50%, rgba(124, 58, 237, 0.1) 0%, rgba(0, 0, 0, 0) 70%)",
+            ]
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        />
+        
+        <div className="container mx-auto px-4 text-center relative z-10">
+          <motion.h2 
+            className="text-3xl md:text-4xl font-bold mb-6"
+            initial={{ y: 30, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
             Ready to Elevate Your Sound?
-          </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
+          </motion.h2>
+          <motion.p 
+            className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8"
+            initial={{ y: 30, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
             Explore our premium beats collection and find the perfect sound for
             your next hit.
-          </p>
-          <Button size="lg" asChild>
-            <Link to="/browse">Browse Beats</Link>
-          </Button>
+          </motion.p>
+          <motion.div
+            initial={{ y: 30, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <Button size="lg" asChild>
+              <Link to="/browse">Browse Beats</Link>
+            </Button>
+          </motion.div>
         </div>
-      </section>
+      </motion.section>
 
       <Footer />
     </div>
