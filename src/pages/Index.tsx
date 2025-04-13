@@ -68,7 +68,7 @@ const Index = () => {
               <div className="relative w-full max-w-md">
                 <div className="aspect-square rounded-lg overflow-hidden bg-secondary border border-primary/20 shadow-xl shadow-primary/10">
                   <img
-                    src="/images/cover-1.jpg"
+                    src="/images/hero-img.jpg"
                     alt="Beat production"
                     className="w-full h-full object-cover"
                   />
@@ -224,28 +224,28 @@ const Index = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="aspect-square rounded-lg overflow-hidden">
                   <img
-                    src="/images/beat-cover-2.jpg"
+                    src="/images/studio-session.jpg"
                     alt="Studio session"
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="aspect-square rounded-lg overflow-hidden mt-8">
                   <img
-                    src="/images/beat-cover-3.jpg"
+                    src="/images/production-equipment.jpg"
                     alt="Production equipment"
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="aspect-square rounded-lg overflow-hidden -mt-8">
                   <img
-                    src="/images/beat-cover-4.jpg"
+                    src="/images/mixing-device.jpg"
                     alt="Mixing console"
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="aspect-square rounded-lg overflow-hidden">
                   <img
-                    src="/images/beat-cover-5.jpg"
+                    src="/images/artist-collaboration.jpg"
                     alt="Artist collaboration"
                     className="w-full h-full object-cover"
                   />
