@@ -55,10 +55,14 @@ const Contact = () => {
     setIsSubmitting(true);
     
     try {
-      // Submit to Supabase
+      // Submit to Supabase - ensure all required fields are present
       const { error } = await supabase
         .from('contact_submissions')
-        .insert(data);
+        .insert({
+          name: data.name,
+          email: data.email,
+          message: data.message
+        });
         
       if (error) {
         throw new Error(error.message);
