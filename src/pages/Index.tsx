@@ -82,7 +82,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" ref={scrollRef}>
+    <div className="min-h-screen flex flex-col relative" ref={scrollRef}>
       <Header />
 
       {/* Hero Section with Parallax */}
