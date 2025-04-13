@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useRef } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,8 @@ import { Switch } from "@/components/ui/switch";
 import { Play, Pencil, Trash2, Upload, Plus } from "lucide-react";
 import { useBeatsStore, Beat } from "@/hooks/useBeatsStore";
 import { formatTime } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const { beats, setCurrentBeat, addBeat, updateBeat, deleteBeat } =
@@ -34,6 +37,7 @@ const Dashboard = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [currentEditBeat, setCurrentEditBeat] = useState<Beat | null>(null);
   const [currentDeleteId, setCurrentDeleteId] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [newBeat, setNewBeat] = useState<Partial<Beat>>({
     title: "",
     artist: "Beat Alchemy",
@@ -41,6 +45,12 @@ const Dashboard = () => {
     bpm: 0,
     isPublished: true,
   });
+
+  // References for file inputs
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const coverArtInputRef = useRef<HTMLInputElement>(null);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [coverArtFile, setCoverArtFile] = useState<File | null>(null);
 
   // Open edit dialog and set beat to edit
   const handleOpenEditDialog = (beat: Beat) => {
@@ -54,54 +64,256 @@ const Dashboard = () => {
     setIsDeleteDialogOpen(true);
   };
 
-  // Add new beat
-  const handleAddBeat = () => {
-    const beatToAdd: Beat = {
-      id: Date.now().toString(),
-      title: newBeat.title || "Untitled Beat",
-      artist: newBeat.artist || "Beat Alchemy",
-      genre: newBeat.genre || "Hip Hop",
-      bpm: newBeat.bpm || 120,
-      duration: 180, // Default 3 minutes
-      coverArt: "/images/beat-cover-1.jpg", // Default cover
-      audioUrl: "/audio/beat-1.mp3", // Default audio
-      dateCreated: new Date(),
-      isPublished:
-        newBeat.isPublished !== undefined ? newBeat.isPublished : true,
-    };
+  // Handle audio file selection
+  const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setAudioFile(file);
+      
+      // Create an audio element to get the duration
+      const audio = new Audio();
+      audio.src = URL.createObjectURL(file);
+      
+      audio.onloadedmetadata = () => {
+        setNewBeat(prev => ({
+          ...prev,
+          duration: audio.duration
+        }));
+      };
+    }
+  };
 
-    addBeat(beatToAdd);
-    setIsAddDialogOpen(false);
+  // Handle cover art file selection
+  const handleCoverArtFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setCoverArtFile(e.target.files[0]);
+    }
+  };
+
+  // Upload files to Supabase storage and create beat record
+  const uploadFilesAndCreateBeat = async () => {
+    try {
+      setIsUploading(true);
+      
+      if (!audioFile) {
+        toast({
+          title: "Error",
+          description: "Please select an audio file",
+          variant: "destructive",
+        });
+        setIsUploading(false);
+        return;
+      }
+
+      // Upload audio file
+      const audioFileName = `${Date.now()}-${audioFile.name}`;
+      const { data: audioData, error: audioError } = await supabase.storage
+        .from('beats')
+        .upload(audioFileName, audioFile);
+
+      if (audioError) {
+        throw new Error(`Audio upload failed: ${audioError.message}`);
+      }
+
+      // Get audio URL
+      const { data: { publicUrl: audioUrl } } = supabase.storage
+        .from('beats')
+        .getPublicUrl(audioFileName);
+
+      // Upload cover art if provided
+      let coverArtUrl = '/images/beat-cover-1.jpg'; // Default cover art
+      if (coverArtFile) {
+        const coverArtFileName = `${Date.now()}-${coverArtFile.name}`;
+        const { data: coverArtData, error: coverArtError } = await supabase.storage
+          .from('cover_art')
+          .upload(coverArtFileName, coverArtFile);
+
+        if (coverArtError) {
+          throw new Error(`Cover art upload failed: ${coverArtError.message}`);
+        }
+
+        // Get cover art URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('cover_art')
+          .getPublicUrl(coverArtFileName);
+        coverArtUrl = publicUrl;
+      }
+
+      // Create beat record in database
+      const beatToAdd = {
+        title: newBeat.title || "Untitled Beat",
+        artist: newBeat.artist || "Beat Alchemy",
+        genre: newBeat.genre || "Hip Hop",
+        bpm: newBeat.bpm || 120,
+        duration: newBeat.duration || 180,
+        is_published: newBeat.isPublished !== undefined ? newBeat.isPublished : true,
+        cover_art_url: coverArtUrl,
+        audio_url: audioUrl
+      };
+
+      const { data: beatData, error: beatError } = await supabase
+        .from('beats')
+        .insert(beatToAdd)
+        .select()
+        .single();
+
+      if (beatError) {
+        throw new Error(`Beat creation failed: ${beatError.message}`);
+      }
+
+      // Add to local state
+      const newBeatForStore: Beat = {
+        id: beatData.id,
+        title: beatData.title,
+        artist: beatData.artist,
+        genre: beatData.genre,
+        bpm: beatData.bpm,
+        duration: beatData.duration,
+        coverArt: beatData.cover_art_url,
+        audioUrl: beatData.audio_url,
+        dateCreated: new Date(beatData.date_created),
+        isPublished: beatData.is_published
+      };
+
+      addBeat(newBeatForStore);
+      resetNewBeatForm();
+      setIsAddDialogOpen(false);
+      
+      toast({
+        title: "Success",
+        description: "Beat uploaded successfully!",
+      });
+    } catch (error) {
+      console.error("Error uploading beat:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to upload beat",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Reset new beat form
+  const resetNewBeatForm = () => {
     setNewBeat({
       title: "",
       artist: "Beat Alchemy",
       genre: "",
       bpm: 0,
       isPublished: true,
+      duration: 0
     });
+    setAudioFile(null);
+    setCoverArtFile(null);
+    if (audioInputRef.current) audioInputRef.current.value = "";
+    if (coverArtInputRef.current) coverArtInputRef.current.value = "";
   };
 
   // Update existing beat
-  const handleUpdateBeat = () => {
+  const handleUpdateBeat = async () => {
     if (currentEditBeat) {
-      updateBeat(currentEditBeat.id, currentEditBeat);
-      setIsEditDialogOpen(false);
-      setCurrentEditBeat(null);
+      try {
+        // Update in Supabase
+        const { error } = await supabase
+          .from('beats')
+          .update({
+            title: currentEditBeat.title,
+            genre: currentEditBeat.genre,
+            bpm: currentEditBeat.bpm,
+            is_published: currentEditBeat.isPublished
+          })
+          .eq('id', currentEditBeat.id);
+
+        if (error) {
+          throw new Error(`Beat update failed: ${error.message}`);
+        }
+
+        // Update local state
+        updateBeat(currentEditBeat.id, currentEditBeat);
+        setIsEditDialogOpen(false);
+        setCurrentEditBeat(null);
+        
+        toast({
+          title: "Success",
+          description: "Beat updated successfully!",
+        });
+      } catch (error) {
+        console.error("Error updating beat:", error);
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to update beat",
+          variant: "destructive",
+        });
+      }
     }
   };
 
   // Delete beat
-  const handleDeleteBeat = () => {
+  const handleDeleteBeat = async () => {
     if (currentDeleteId) {
-      deleteBeat(currentDeleteId);
-      setIsDeleteDialogOpen(false);
-      setCurrentDeleteId(null);
+      try {
+        // Delete from Supabase
+        const { error } = await supabase
+          .from('beats')
+          .delete()
+          .eq('id', currentDeleteId);
+
+        if (error) {
+          throw new Error(`Beat deletion failed: ${error.message}`);
+        }
+
+        // Delete from local state
+        deleteBeat(currentDeleteId);
+        setIsDeleteDialogOpen(false);
+        setCurrentDeleteId(null);
+        
+        toast({
+          title: "Success",
+          description: "Beat deleted successfully!",
+        });
+      } catch (error) {
+        console.error("Error deleting beat:", error);
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to delete beat",
+          variant: "destructive",
+        });
+      }
     }
   };
 
   // Toggle beat published status
-  const handleTogglePublished = (id: string, currentStatus: boolean) => {
-    updateBeat(id, { isPublished: !currentStatus });
+  const handleTogglePublished = async (id: string, currentStatus: boolean) => {
+    try {
+      // Update in Supabase
+      const { error } = await supabase
+        .from('beats')
+        .update({
+          is_published: !currentStatus
+        })
+        .eq('id', id);
+
+      if (error) {
+        throw new Error(`Status update failed: ${error.message}`);
+      }
+
+      // Update local state
+      updateBeat(id, { isPublished: !currentStatus });
+      
+      toast({
+        title: "Success",
+        description: `Beat ${!currentStatus ? 'published' : 'unpublished'} successfully!`,
+      });
+    } catch (error) {
+      console.error("Error updating beat status:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update beat status",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -211,25 +423,75 @@ const Dashboard = () => {
 
             <div className="grid gap-2">
               <Label htmlFor="audio-file">Audio File</Label>
-              <div className="border border-dashed border-border rounded-lg p-6 text-center cursor-pointer">
-                <Upload className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Click to upload or drag and drop
-                  <br />
-                  MP3, WAV (max 20MB)
-                </p>
+              <div 
+                className="border border-dashed border-border rounded-lg p-6 text-center cursor-pointer"
+                onClick={() => audioInputRef.current?.click()}
+              >
+                <input
+                  type="file"
+                  ref={audioInputRef}
+                  className="hidden"
+                  id="audio-file"
+                  accept="audio/mp3,audio/wav"
+                  onChange={handleAudioFileChange}
+                />
+                {audioFile ? (
+                  <div className="flex flex-col items-center">
+                    <div className="text-green-500 mb-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"></path><path d="m9 12 2 2 4-4"></path></svg>
+                    </div>
+                    <p className="text-sm font-medium">{audioFile.name}</p>
+                    <p className="text-xs text-muted-foreground">{(audioFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Click to upload or drag and drop
+                      <br />
+                      MP3, WAV (max 20MB)
+                    </p>
+                  </>
+                )}
               </div>
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="cover-art">Cover Art</Label>
-              <div className="border border-dashed border-border rounded-lg p-6 text-center cursor-pointer">
-                <Upload className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Click to upload or drag and drop
-                  <br />
-                  PNG, JPG, WEBP (max 2MB)
-                </p>
+              <div 
+                className="border border-dashed border-border rounded-lg p-6 text-center cursor-pointer"
+                onClick={() => coverArtInputRef.current?.click()}
+              >
+                <input
+                  type="file"
+                  ref={coverArtInputRef}
+                  className="hidden"
+                  id="cover-art"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  onChange={handleCoverArtFileChange}
+                />
+                {coverArtFile ? (
+                  <div className="flex flex-col items-center">
+                    <div className="h-24 w-24 bg-secondary rounded-md overflow-hidden mb-2">
+                      <img 
+                        src={URL.createObjectURL(coverArtFile)}
+                        alt="Cover Preview"
+                        className="h-full w-full object-cover" 
+                      />
+                    </div>
+                    <p className="text-sm font-medium">{coverArtFile.name}</p>
+                    <p className="text-xs text-muted-foreground">{(coverArtFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Click to upload or drag and drop
+                      <br />
+                      PNG, JPG, WEBP (max 2MB)
+                    </p>
+                  </>
+                )}
               </div>
             </div>
 
@@ -246,10 +508,15 @@ const Dashboard = () => {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              resetNewBeatForm();
+              setIsAddDialogOpen(false);
+            }}>
               Cancel
             </Button>
-            <Button onClick={handleAddBeat}>Add Beat</Button>
+            <Button onClick={uploadFilesAndCreateBeat} disabled={isUploading}>
+              {isUploading ? "Uploading..." : "Add Beat"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

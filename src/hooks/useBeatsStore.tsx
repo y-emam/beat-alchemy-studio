@@ -1,5 +1,7 @@
 
 import { create } from 'zustand';
+import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
 
 export interface Beat {
   id: string;
@@ -18,6 +20,9 @@ interface BeatsStore {
   beats: Beat[];
   currentBeat: Beat | null;
   isPlayerOpen: boolean;
+  isLoading: boolean;
+  error: string | null;
+  fetchBeats: () => Promise<void>;
   addBeat: (beat: Beat) => void;
   updateBeat: (id: string, updatedBeat: Partial<Beat>) => void;
   deleteBeat: (id: string) => void;
@@ -25,7 +30,7 @@ interface BeatsStore {
   togglePlayer: (open?: boolean) => void;
 }
 
-// Sample data for beats
+// Sample data for beats as fallback
 const sampleBeats: Beat[] = [
   {
     id: '1',
@@ -101,13 +106,51 @@ const sampleBeats: Beat[] = [
   }
 ];
 
-export const useBeatsStore = create<BeatsStore>((set) => ({
+export const useBeatsStore = create<BeatsStore>((set, get) => ({
   beats: sampleBeats,
   currentBeat: null,
   isPlayerOpen: false,
+  isLoading: false,
+  error: null,
+
+  fetchBeats: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data, error } = await supabase
+        .from('beats')
+        .select('*')
+        .order('date_created', { ascending: false });
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data) {
+        const formattedBeats: Beat[] = data.map(beat => ({
+          id: beat.id,
+          title: beat.title,
+          artist: beat.artist,
+          genre: beat.genre,
+          bpm: beat.bpm,
+          duration: Number(beat.duration),
+          coverArt: beat.cover_art_url || '/images/beat-cover-1.jpg',
+          audioUrl: beat.audio_url || '/audio/beat-1.mp3',
+          dateCreated: new Date(beat.date_created),
+          isPublished: beat.is_published
+        }));
+
+        set({ beats: formattedBeats });
+      }
+    } catch (error) {
+      console.error('Error fetching beats:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to fetch beats' });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
 
   addBeat: (beat) => set((state) => ({ 
-    beats: [...state.beats, beat] 
+    beats: [beat, ...state.beats] 
   })),
 
   updateBeat: (id, updatedBeat) => set((state) => ({ 
@@ -136,3 +179,12 @@ export const useBeatsStore = create<BeatsStore>((set) => ({
     isPlayerOpen: open !== undefined ? open : !state.isPlayerOpen 
   })),
 }));
+
+// Custom hook to initialize beats from Supabase when the app loads
+export const useFetchBeats = () => {
+  const { fetchBeats } = useBeatsStore();
+  
+  useEffect(() => {
+    fetchBeats();
+  }, [fetchBeats]);
+};

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
@@ -11,15 +11,18 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { Play, Search, SlidersHorizontal } from 'lucide-react';
-import { useBeatsStore } from '@/hooks/useBeatsStore';
+import { Play, Search, SlidersHorizontal, Loader2 } from 'lucide-react';
+import { useBeatsStore, useFetchBeats } from '@/hooks/useBeatsStore';
 import { formatTime } from '@/lib/utils';
 
 const Browse = () => {
-  const { beats, setCurrentBeat } = useBeatsStore();
+  const { beats, setCurrentBeat, isLoading, error } = useBeatsStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [genreFilter, setGenreFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<string>('newest');
+  
+  // Initialize data from Supabase
+  useFetchBeats();
   
   // Extract unique genres from beats
   const genres = ['all', ...Array.from(new Set(beats.map(beat => beat.genre.toLowerCase())))];
@@ -99,7 +102,17 @@ const Browse = () => {
               </div>
             </div>
             
-            {filteredBeats.length === 0 ? (
+            {isLoading ? (
+              <div className="text-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                <p className="text-muted-foreground">Loading beats...</p>
+              </div>
+            ) : error ? (
+              <div className="text-center py-12 text-destructive">
+                <p className="text-lg font-medium mb-2">Something went wrong</p>
+                <p className="text-sm">{error}</p>
+              </div>
+            ) : filteredBeats.length === 0 ? (
               <div className="text-center py-12">
                 <h3 className="text-2xl font-medium mb-2">No beats found</h3>
                 <p className="text-muted-foreground">Try adjusting your search or filters</p>

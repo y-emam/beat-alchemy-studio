@@ -9,12 +9,16 @@ import Browse from "./pages/Browse";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import { MusicPlayer } from "./components/audio/MusicPlayer";
-import { useBeatsStore } from "./hooks/useBeatsStore";
+import { useBeatsStore, useFetchBeats } from "./hooks/useBeatsStore";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   const { currentBeat, setCurrentBeat } = useBeatsStore();
+  
+  // Initialize beats from Supabase
+  useFetchBeats();
 
   return (
     <QueryClientProvider client={queryClient}>
