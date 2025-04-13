@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Play, Pause, SkipForward, SkipBack, Volume2, Volume1, VolumeX } from 'lucide-react';
 import { formatTime } from '@/lib/utils';
+import { Beat } from '@/hooks/useBeatsStore';
 
 interface MusicPlayerProps {
   currentBeat: Beat | null;
