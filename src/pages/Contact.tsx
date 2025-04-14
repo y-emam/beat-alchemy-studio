@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -21,6 +20,7 @@ import {
 import { Send, CheckCircle, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Resend } from "resend";
 
 // Define the form schema using zod
 const formSchema = z.object({
@@ -53,34 +53,59 @@ const Contact = () => {
 
   const onSubmit = async (data: ContactFormValues) => {
     setIsSubmitting(true);
-    
+
     try {
       // Submit to Supabase - ensure all required fields are present
-      const { error } = await supabase
-        .from('contact_submissions')
-        .insert({
-          name: data.name,
-          email: data.email,
-          message: data.message
-        });
-        
+      const { error } = await supabase.from("contact_submissions").insert({
+        name: data.name,
+        email: data.email,
+        message: data.message,
+      });
+
       if (error) {
         throw new Error(error.message);
       }
-      
+
+      // Send email using supabase edge function
+      fetch(
+        "https://iqlkrnlehiwzrztkpzzk.supabase.co/functions/v1/send-contact-email",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: data.name,
+            email: data.email,
+            message: data.message,
+          }),
+        }
+      )
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("Failed to send email");
+          }
+          return response.json();
+        })
+        .then((data) => {
+          console.log("Email sent successfully:", data);
+        })
+        .catch((error) => {
+          console.error("Error sending email:", error);
+        });
+
       // Show success
       setIsSuccess(true);
       toast({
         title: "Message sent successfully!",
         description: "We'll get back to you as soon as possible.",
       });
-      
+
       // Reset form
       form.reset();
-      
+
       // Reset success state after 5 seconds
       setTimeout(() => setIsSuccess(false), 5000);
-      
     } catch (error) {
       console.error("Error submitting contact form:", error);
       toast({
@@ -107,10 +132,13 @@ const Contact = () => {
                 transition={{ duration: 0.5 }}
                 className="text-center mb-10"
               >
-                <h1 className="text-4xl md:text-5xl font-bold mb-4">Get In Touch</h1>
+                <h1 className="text-4xl md:text-5xl font-bold mb-4">
+                  Get In Touch
+                </h1>
                 <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-                  Have questions about our beats or interested in custom productions?
-                  Fill out the form below and we'll get back to you soon.
+                  Have questions about our beats or interested in custom
+                  productions? Fill out the form below and we'll get back to you
+                  soon.
                 </p>
               </motion.div>
 
@@ -131,13 +159,19 @@ const Contact = () => {
                     </motion.div>
                     <h2 className="text-2xl font-bold mb-2">Thank You!</h2>
                     <p className="text-muted-foreground mb-6">
-                      Your message has been sent successfully. We'll get back to you soon.
+                      Your message has been sent successfully. We'll get back to
+                      you soon.
                     </p>
-                    <Button onClick={() => setIsSuccess(false)}>Send Another Message</Button>
+                    <Button onClick={() => setIsSuccess(false)}>
+                      Send Another Message
+                    </Button>
                   </div>
                 ) : (
                   <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <form
+                      onSubmit={form.handleSubmit(onSubmit)}
+                      className="space-y-6"
+                    >
                       <FormField
                         control={form.control}
                         name="name"
@@ -151,7 +185,7 @@ const Contact = () => {
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={form.control}
                         name="email"
@@ -159,13 +193,17 @@ const Contact = () => {
                           <FormItem>
                             <FormLabel>Email</FormLabel>
                             <FormControl>
-                              <Input type="email" placeholder="your.email@example.com" {...field} />
+                              <Input
+                                type="email"
+                                placeholder="your.email@example.com"
+                                {...field}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={form.control}
                         name="message"
@@ -173,18 +211,22 @@ const Contact = () => {
                           <FormItem>
                             <FormLabel>Message</FormLabel>
                             <FormControl>
-                              <Textarea 
+                              <Textarea
                                 placeholder="Tell us how we can help..."
-                                className="min-h-[150px]" 
-                                {...field} 
+                                className="min-h-[150px]"
+                                {...field}
                               />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                      
-                      <Button type="submit" className="w-full md:w-auto" disabled={isSubmitting}>
+
+                      <Button
+                        type="submit"
+                        className="w-full md:w-auto"
+                        disabled={isSubmitting}
+                      >
                         {isSubmitting ? (
                           <>Processing...</>
                         ) : (
