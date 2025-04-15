@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -41,7 +40,18 @@ const Dashboard = () => {
   const [currentDeleteId, setCurrentDeleteId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [contactSubmissions, setContactSubmissions] = useState<any[]>([]);
+  interface ContactSubmission {
+    id: string;
+    name: string;
+    email: string;
+    message: string;
+    created_at: string;
+    processed: boolean;
+  }
+
+  const [contactSubmissions, setContactSubmissions] = useState<
+    ContactSubmission[]
+  >([]);
   const [newBeat, setNewBeat] = useState<Partial<Beat>>({
     title: "",
     artist: "Beat Alchemy",
@@ -58,8 +68,8 @@ const Dashboard = () => {
 
   // Check for stored admin authentication on mount
   useEffect(() => {
-    const adminAuth = localStorage.getItem('adminAuthenticated');
-    if (adminAuth === 'true') {
+    const adminAuth = localStorage.getItem("adminAuthenticated");
+    if (adminAuth === "true") {
       setIsAuthenticated(true);
       fetchContactSubmissions();
     }
@@ -69,12 +79,12 @@ const Dashboard = () => {
   const fetchContactSubmissions = async () => {
     try {
       const { data, error } = await supabase
-        .from('contact_submissions')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
+        .from("contact_submissions")
+        .select("*")
+        .order("created_at", { ascending: false });
+
       if (error) throw error;
-      
+
       setContactSubmissions(data || []);
     } catch (error) {
       console.error("Error fetching contact submissions:", error);
@@ -109,15 +119,15 @@ const Dashboard = () => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setAudioFile(file);
-      
+
       // Create an audio element to get the duration
       const audio = new Audio();
       audio.src = URL.createObjectURL(file);
-      
+
       audio.onloadedmetadata = () => {
-        setNewBeat(prev => ({
+        setNewBeat((prev) => ({
           ...prev,
-          duration: audio.duration
+          duration: audio.duration,
         }));
       };
     }
@@ -134,7 +144,7 @@ const Dashboard = () => {
   const uploadFilesAndCreateBeat = async () => {
     try {
       setIsUploading(true);
-      
+
       if (!audioFile) {
         toast({
           title: "Error",
@@ -148,7 +158,7 @@ const Dashboard = () => {
       // Upload audio file
       const audioFileName = `${Date.now()}-${audioFile.name}`;
       const { data: audioData, error: audioError } = await supabase.storage
-        .from('beats')
+        .from("beats")
         .upload(audioFileName, audioFile);
 
       if (audioError) {
@@ -156,26 +166,27 @@ const Dashboard = () => {
       }
 
       // Get audio URL
-      const { data: { publicUrl: audioUrl } } = supabase.storage
-        .from('beats')
-        .getPublicUrl(audioFileName);
+      const {
+        data: { publicUrl: audioUrl },
+      } = supabase.storage.from("beats").getPublicUrl(audioFileName);
 
       // Upload cover art if provided
-      let coverArtUrl = '/images/beat-cover-1.jpg'; // Default cover art
+      let coverArtUrl = "/images/beat-cover-1.jpg"; // Default cover art
       if (coverArtFile) {
         const coverArtFileName = `${Date.now()}-${coverArtFile.name}`;
-        const { data: coverArtData, error: coverArtError } = await supabase.storage
-          .from('cover_art')
-          .upload(coverArtFileName, coverArtFile);
+        const { data: coverArtData, error: coverArtError } =
+          await supabase.storage
+            .from("cover_art")
+            .upload(coverArtFileName, coverArtFile);
 
         if (coverArtError) {
           throw new Error(`Cover art upload failed: ${coverArtError.message}`);
         }
 
         // Get cover art URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('cover_art')
-          .getPublicUrl(coverArtFileName);
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("cover_art").getPublicUrl(coverArtFileName);
         coverArtUrl = publicUrl;
       }
 
@@ -186,13 +197,14 @@ const Dashboard = () => {
         genre: newBeat.genre || "Hip Hop",
         bpm: newBeat.bpm || 120,
         duration: newBeat.duration || 180,
-        is_published: newBeat.isPublished !== undefined ? newBeat.isPublished : true,
+        is_published:
+          newBeat.isPublished !== undefined ? newBeat.isPublished : true,
         cover_art_url: coverArtUrl,
-        audio_url: audioUrl
+        audio_url: audioUrl,
       };
 
       const { data: beatData, error: beatError } = await supabase
-        .from('beats')
+        .from("beats")
         .insert(beatToAdd)
         .select()
         .single();
@@ -212,13 +224,13 @@ const Dashboard = () => {
         coverArt: beatData.cover_art_url,
         audioUrl: beatData.audio_url,
         dateCreated: new Date(beatData.date_created),
-        isPublished: beatData.is_published
+        isPublished: beatData.is_published,
       };
 
       addBeat(newBeatForStore);
       resetNewBeatForm();
       setIsAddDialogOpen(false);
-      
+
       toast({
         title: "Success",
         description: "Beat uploaded successfully!",
@@ -227,7 +239,8 @@ const Dashboard = () => {
       console.error("Error uploading beat:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to upload beat",
+        description:
+          error instanceof Error ? error.message : "Failed to upload beat",
         variant: "destructive",
       });
     } finally {
@@ -243,7 +256,7 @@ const Dashboard = () => {
       genre: "",
       bpm: 0,
       isPublished: true,
-      duration: 0
+      duration: 0,
     });
     setAudioFile(null);
     setCoverArtFile(null);
@@ -257,14 +270,14 @@ const Dashboard = () => {
       try {
         // Update in Supabase
         const { error } = await supabase
-          .from('beats')
+          .from("beats")
           .update({
             title: currentEditBeat.title,
             genre: currentEditBeat.genre,
             bpm: currentEditBeat.bpm,
-            is_published: currentEditBeat.isPublished
+            is_published: currentEditBeat.isPublished,
           })
-          .eq('id', currentEditBeat.id);
+          .eq("id", currentEditBeat.id);
 
         if (error) {
           throw new Error(`Beat update failed: ${error.message}`);
@@ -274,7 +287,7 @@ const Dashboard = () => {
         updateBeat(currentEditBeat.id, currentEditBeat);
         setIsEditDialogOpen(false);
         setCurrentEditBeat(null);
-        
+
         toast({
           title: "Success",
           description: "Beat updated successfully!",
@@ -283,7 +296,8 @@ const Dashboard = () => {
         console.error("Error updating beat:", error);
         toast({
           title: "Error",
-          description: error instanceof Error ? error.message : "Failed to update beat",
+          description:
+            error instanceof Error ? error.message : "Failed to update beat",
           variant: "destructive",
         });
       }
@@ -296,9 +310,9 @@ const Dashboard = () => {
       try {
         // Delete from Supabase
         const { error } = await supabase
-          .from('beats')
+          .from("beats")
           .delete()
-          .eq('id', currentDeleteId);
+          .eq("id", currentDeleteId);
 
         if (error) {
           throw new Error(`Beat deletion failed: ${error.message}`);
@@ -308,7 +322,7 @@ const Dashboard = () => {
         deleteBeat(currentDeleteId);
         setIsDeleteDialogOpen(false);
         setCurrentDeleteId(null);
-        
+
         toast({
           title: "Success",
           description: "Beat deleted successfully!",
@@ -317,7 +331,8 @@ const Dashboard = () => {
         console.error("Error deleting beat:", error);
         toast({
           title: "Error",
-          description: error instanceof Error ? error.message : "Failed to delete beat",
+          description:
+            error instanceof Error ? error.message : "Failed to delete beat",
           variant: "destructive",
         });
       }
@@ -329,11 +344,11 @@ const Dashboard = () => {
     try {
       // Update in Supabase
       const { error } = await supabase
-        .from('beats')
+        .from("beats")
         .update({
-          is_published: !currentStatus
+          is_published: !currentStatus,
         })
-        .eq('id', id);
+        .eq("id", id);
 
       if (error) {
         throw new Error(`Status update failed: ${error.message}`);
@@ -341,16 +356,19 @@ const Dashboard = () => {
 
       // Update local state
       updateBeat(id, { isPublished: !currentStatus });
-      
+
       toast({
         title: "Success",
-        description: `Beat ${!currentStatus ? 'published' : 'unpublished'} successfully!`,
+        description: `Beat ${!currentStatus ? "published" : "unpublished"} successfully!`,
       });
     } catch (error) {
       console.error("Error updating beat status:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update beat status",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to update beat status",
         variant: "destructive",
       });
     }
@@ -360,22 +378,22 @@ const Dashboard = () => {
   const toggleContactProcessed = async (id: string, currentStatus: boolean) => {
     try {
       const { error } = await supabase
-        .from('contact_submissions')
+        .from("contact_submissions")
         .update({ processed: !currentStatus })
-        .eq('id', id);
-        
+        .eq("id", id);
+
       if (error) throw error;
-      
+
       // Update local state
-      setContactSubmissions(prevSubmissions =>
-        prevSubmissions.map(sub =>
+      setContactSubmissions((prevSubmissions) =>
+        prevSubmissions.map((sub) =>
           sub.id === id ? { ...sub, processed: !currentStatus } : sub
         )
       );
-      
+
       toast({
         title: "Status updated",
-        description: `Message marked as ${!currentStatus ? 'processed' : 'unprocessed'}`
+        description: `Message marked as ${!currentStatus ? "processed" : "unprocessed"}`,
       });
     } catch (error) {
       console.error("Error updating submission:", error);
@@ -389,8 +407,8 @@ const Dashboard = () => {
 
   // Admin logout
   const handleLogout = () => {
-    localStorage.removeItem('adminAuthenticated');
-    localStorage.removeItem('adminUsername');
+    localStorage.removeItem("adminAuthenticated");
+    localStorage.removeItem("adminUsername");
     setIsAuthenticated(false);
   };
 
@@ -408,16 +426,21 @@ const Dashboard = () => {
             <div className="container mx-auto px-4">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                  <h1 className="text-3xl md:text-4xl font-bold">Admin Dashboard</h1>
+                  <h1 className="text-3xl md:text-4xl font-bold">
+                    Admin Dashboard
+                  </h1>
                   <p className="text-muted-foreground">
-                    Welcome back, {localStorage.getItem('adminUsername') || 'Admin'}
+                    Welcome back,{" "}
+                    {localStorage.getItem("adminUsername") || "Admin"}
                   </p>
                 </div>
                 <div className="flex gap-4">
                   <Button onClick={() => setIsAddDialogOpen(true)}>
                     <Plus className="mr-2" size={16} /> Add New Beat
                   </Button>
-                  <Button variant="outline" onClick={handleLogout}>Logout</Button>
+                  <Button variant="outline" onClick={handleLogout}>
+                    Logout
+                  </Button>
                 </div>
               </div>
 
@@ -468,9 +491,9 @@ const Dashboard = () => {
                 </TabsContent>
 
                 <TabsContent value="contact">
-                  <ContactMessagesTable 
-                    submissions={contactSubmissions} 
-                    onToggleProcessed={toggleContactProcessed} 
+                  <ContactMessagesTable
+                    submissions={contactSubmissions}
+                    onToggleProcessed={toggleContactProcessed}
                   />
                 </TabsContent>
               </Tabs>
@@ -531,7 +554,7 @@ const Dashboard = () => {
 
             <div className="grid gap-2">
               <Label htmlFor="audio-file">Audio File</Label>
-              <div 
+              <div
                 className="border border-dashed border-border rounded-lg p-6 text-center cursor-pointer"
                 onClick={() => audioInputRef.current?.click()}
               >
@@ -546,10 +569,26 @@ const Dashboard = () => {
                 {audioFile ? (
                   <div className="flex flex-col items-center">
                     <div className="text-green-500 mb-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"></path><path d="m9 12 2 2 4-4"></path></svg>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="mx-auto"
+                      >
+                        <path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"></path>
+                        <path d="m9 12 2 2 4-4"></path>
+                      </svg>
                     </div>
                     <p className="text-sm font-medium">{audioFile.name}</p>
-                    <p className="text-xs text-muted-foreground">{(audioFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(audioFile.size / (1024 * 1024)).toFixed(2)} MB
+                    </p>
                   </div>
                 ) : (
                   <>
@@ -566,7 +605,7 @@ const Dashboard = () => {
 
             <div className="grid gap-2">
               <Label htmlFor="cover-art">Cover Art</Label>
-              <div 
+              <div
                 className="border border-dashed border-border rounded-lg p-6 text-center cursor-pointer"
                 onClick={() => coverArtInputRef.current?.click()}
               >
@@ -581,14 +620,16 @@ const Dashboard = () => {
                 {coverArtFile ? (
                   <div className="flex flex-col items-center">
                     <div className="h-24 w-24 bg-secondary rounded-md overflow-hidden mb-2">
-                      <img 
+                      <img
                         src={URL.createObjectURL(coverArtFile)}
                         alt="Cover Preview"
-                        className="h-full w-full object-cover" 
+                        className="h-full w-full object-cover"
                       />
                     </div>
                     <p className="text-sm font-medium">{coverArtFile.name}</p>
-                    <p className="text-xs text-muted-foreground">{(coverArtFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(coverArtFile.size / (1024 * 1024)).toFixed(2)} MB
+                    </p>
                   </div>
                 ) : (
                   <>
@@ -616,10 +657,13 @@ const Dashboard = () => {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              resetNewBeatForm();
-              setIsAddDialogOpen(false);
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                resetNewBeatForm();
+                setIsAddDialogOpen(false);
+              }}
+            >
               Cancel
             </Button>
             <Button onClick={uploadFilesAndCreateBeat} disabled={isUploading}>
@@ -824,7 +868,14 @@ const BeatTable = ({
 
 // Contact messages table component
 interface ContactMessagesTableProps {
-  submissions: any[];
+  submissions: {
+    id: string;
+    name: string;
+    email: string;
+    message: string;
+    created_at: string;
+    processed: boolean;
+  }[];
   onToggleProcessed: (id: string, currentStatus: boolean) => void;
 }
 
@@ -836,14 +887,16 @@ const ContactMessagesTable = ({
     return (
       <div className="text-center py-12 bg-secondary rounded-lg">
         <h3 className="text-xl font-medium mb-2">No contact messages yet</h3>
-        <p className="text-muted-foreground">Messages from the contact form will appear here</p>
+        <p className="text-muted-foreground">
+          Messages from the contact form will appear here
+        </p>
       </div>
     );
   }
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    return date.toLocaleDateString() + " " + date.toLocaleTimeString();
   };
 
   return (
@@ -860,14 +913,22 @@ const ContactMessagesTable = ({
         </TableHeader>
         <TableBody>
           {submissions.map((submission) => (
-            <TableRow key={submission.id} className={submission.processed ? 'opacity-60' : ''}>
+            <TableRow
+              key={submission.id}
+              className={submission.processed ? "opacity-60" : ""}
+            >
               <TableCell className="font-medium">{submission.name}</TableCell>
               <TableCell>
-                <a href={`mailto:${submission.email}`} className="text-primary hover:underline flex items-center gap-1">
+                <a
+                  href={`mailto:${submission.email}`}
+                  className="text-primary hover:underline flex items-center gap-1"
+                >
                   {submission.email} <Mail size={14} />
                 </a>
               </TableCell>
-              <TableCell className="max-w-xs truncate">{submission.message}</TableCell>
+              <TableCell className="max-w-xs truncate">
+                {submission.message}
+              </TableCell>
               <TableCell>{formatDate(submission.created_at)}</TableCell>
               <TableCell className="text-center">
                 <div className="flex items-center justify-center">
